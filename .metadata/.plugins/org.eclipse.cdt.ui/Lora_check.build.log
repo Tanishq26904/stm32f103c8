@@ -1,0 +1,33 @@
+21:54:54 **** Incremental Build of configuration Debug for project Lora_check ****
+make -j12 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m3 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F103xB -c -I../Core/Inc -I../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I../Drivers/STM32F1xx_HAL_Driver/Inc -I../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfloat-abi=soft -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'main':
+../Core/Src/main.c:96:62: warning: conversion from 'unsigned int' to 'uint8_t' {aka 'unsigned char'} changes value from '256' to '0' [-Woverflow]
+   96 |         received_bytes = LoRa_receive(&lora, receive_buffer, sizeof(receive_buffer));
+      |                                                              ^~~~~~~~~~~~~~~~~~~~~~
+../Core/Src/main.c:100:50: warning: '%s' directive writing up to 255 bytes into a region of size between 30 and 32 [-Wformat-overflow=]
+  100 |             sprintf(message, "Received %d bytes: %s\r\n", received_bytes, receive_buffer);
+      |                                                  ^~                       ~~~~~~~~~~~~~~
+../Core/Src/main.c:100:13: note: 'sprintf' output between 21 and 278 bytes into a destination of size 50
+  100 |             sprintf(message, "Received %d bytes: %s\r\n", received_bytes, receive_buffer);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+arm-none-eabi-gcc -o "Lora_check.elf" @"objects.list"   -mcpu=cortex-m3 -T"D:\projects\stm32_cube_ide\Lora_check\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Lora_check.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Lora_check.elf
+ 
+arm-none-eabi-size  Lora_check.elf 
+arm-none-eabi-objdump -h -S Lora_check.elf  > "Lora_check.list"
+   text	   data	    bss	    dec	    hex	filename
+  34816	    468	   2108	  37392	   9210	Lora_check.elf
+arm-none-eabi-objcopy  -O ihex Lora_check.elf  "Lora_check.hex"
+Finished building: default.size.stdout
+arm-none-eabi-objcopy  -O binary Lora_check.elf  "Lora_check.bin"
+ 
+Finished building: Lora_check.hex
+Finished building: Lora_check.bin
+ 
+ 
+Finished building: Lora_check.list
+ 
+
+21:54:56 Build Finished. 0 errors, 2 warnings. (took 1s.757ms)
+

@@ -1,0 +1,27 @@
+20:14:27 **** Incremental Build of configuration Debug for project LoRa_Sx1278 ****
+make -j12 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m3 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F103xB -c -I../Core/Inc -I../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I../Drivers/STM32F1xx_HAL_Driver/Inc -I../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfloat-abi=soft -mthumb -o "Core/Src/main.o"
+In file included from ../Core/Src/main.c:25:
+../Core/Inc/LoRa.h:1:1: warning: multi-line comment [-Wcomment]
+    1 | // -------------------------------------------------- \\
+      | ^
+../Core/Src/main.c: In function 'main':
+../Core/Src/main.c:107:28: error: 'RESET_GPIO_Port' undeclared (first use in this function); did you mean 'RST_GPIO_Port'?
+  107 |   myLoRa.reset_port      = RESET_GPIO_Port;
+      |                            ^~~~~~~~~~~~~~~
+      |                            RST_GPIO_Port
+../Core/Src/main.c:107:28: note: each undeclared identifier is reported only once for each function it appears in
+../Core/Src/main.c:108:28: error: 'RESET_Pin' undeclared (first use in this function); did you mean 'RST_Pin'?
+  108 |   myLoRa.reset_pin       = RESET_Pin;
+      |                            ^~~~~~~~~
+      |                            RST_Pin
+../Core/Src/main.c: In function 'MX_GPIO_Init':
+../Core/Src/main.c:342:36: error: 'RESET_Pin' undeclared (first use in this function); did you mean 'RST_Pin'?
+  342 |   HAL_GPIO_WritePin(GPIOB, NSS_Pin|RESET_Pin, GPIO_PIN_SET);
+      |                                    ^~~~~~~~~
+      |                                    RST_Pin
+make: *** [Core/Src/subdir.mk:37: Core/Src/main.o] Error 1
+"make -j12 all" terminated with exit code 2. Build might be incomplete.
+
+20:14:28 Build Failed. 4 errors, 1 warnings. (took 356ms)
+

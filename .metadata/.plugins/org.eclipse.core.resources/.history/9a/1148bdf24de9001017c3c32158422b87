@@ -1,0 +1,7 @@
+../Core/Src/bmp180.c:38:6:readCalibrationData	48	static
+../Core/Src/bmp180.c:57:10:Get_UTemp	32	static
+../Core/Src/bmp180.c:68:7:BMP180_GetTemp	8	static
+../Core/Src/bmp180.c:80:10:Get_UPress	32	static
+../Core/Src/bmp180.c:99:7:BMP180_GetPress	8	static
+../Core/Src/bmp180.c:127:7:BMP180_GetAltitude	16	static
+../Core/Src/bmp180.c:133:6:BMP180_Start	8	static

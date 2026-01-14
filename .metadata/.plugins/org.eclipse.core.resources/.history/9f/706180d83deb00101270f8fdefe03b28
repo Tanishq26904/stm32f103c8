@@ -1,0 +1,214 @@
+#include "main.h"
+#include <string.h>
+#include <stdio.h>
+
+/* ================= MPU6050 DEFINES ================= */
+#define MPU6050_ADDR        (0x68 << 1)
+#define WHO_AM_I            0x75
+#define PWR_MGMT_1          0x6B
+#define ACCEL_XOUT_H        0x3B
+#define GYRO_XOUT_H         0x43
+
+/* ================= HANDLES ================= */
+I2C_HandleTypeDef hi2c1;
+UART_HandleTypeDef huart1;
+
+/* ================= GLOBALS ================= */
+float accel_offset_x = 0, accel_offset_y = 0, accel_offset_z = 0;
+float gyro_offset_x  = 0, gyro_offset_y  = 0, gyro_offset_z  = 0;
+
+/* ================= PROTOTYPES ================= */
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_I2C1_Init(void);
+static void MX_USART1_UART_Init(void);
+
+void printu(char *msg);
+void MPU6050_Detect(void);
+void MPU6050_Init(void);
+void MPU6050_Calibrate(void);
+void MPU6050_Read(void);
+
+/* ================= MAIN ================= */
+int main(void)
+{
+  HAL_Init();
+  SystemClock_Config();
+
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  MX_USART1_UART_Init();
+
+  HAL_Delay(200);
+
+  printu("\r\n===== MPU6050 FULL TEST =====\r\n");
+
+  MPU6050_Detect();
+  MPU6050_Init();
+  MPU6050_Calibrate();
+
+  while (1)
+  {
+    MPU6050_Read();
+    HAL_Delay(200);
+  }
+}
+
+/* ================= UART PRINT ================= */
+void printu(char *msg)
+{
+  HAL_UART_Transmit(&huart1, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+}
+
+/* ================= MPU6050 DETECT ================= */
+void MPU6050_Detect(void)
+{
+  uint8_t id;
+  char buf[50];
+
+  HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDR, WHO_AM_I, 1, &id, 1, HAL_MAX_DELAY);
+  sprintf(buf, "WHO_AM_I = 0x%02X\r\n", id);
+  printu(buf);
+
+  if (id == 0x68)
+    printu("MPU6050 DETECTED ✅\r\n");
+  else
+    printu("MPU6050 NOT FOUND ❌\r\n");
+}
+
+/* ================= MPU6050 INIT ================= */
+void MPU6050_Init(void)
+{
+  uint8_t data = 0x00;
+  HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDR, PWR_MGMT_1, 1, &data, 1, HAL_MAX_DELAY);
+  printu("MPU6050 INITIALIZED\r\n");
+}
+
+/* ================= CALIBRATION ================= */
+void MPU6050_Calibrate(void)
+{
+  int16_t ax, ay, az, gx, gy, gz;
+  uint8_t raw[14];
+  int samples = 1000;
+
+  printu("Calibrating... KEEP SENSOR STILL\r\n");
+
+  for (int i = 0; i < samples; i++)
+  {
+    HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDR, ACCEL_XOUT_H, 1, raw, 14, HAL_MAX_DELAY);
+
+    ax = (raw[0] << 8) | raw[1];
+    ay = (raw[2] << 8) | raw[3];
+    az = (raw[4] << 8) | raw[5];
+    gx = (raw[8] << 8) | raw[9];
+    gy = (raw[10] << 8) | raw[11];
+    gz = (raw[12] << 8) | raw[13];
+
+    accel_offset_x += ax;
+    accel_offset_y += ay;
+    accel_offset_z += (az - 16384);  // remove gravity
+    gyro_offset_x  += gx;
+    gyro_offset_y  += gy;
+    gyro_offset_z  += gz;
+
+    HAL_Delay(2);
+  }
+
+  accel_offset_x /= samples;
+  accel_offset_y /= samples;
+  accel_offset_z /= samples;
+  gyro_offset_x  /= samples;
+  gyro_offset_y  /= samples;
+  gyro_offset_z  /= samples;
+
+  printu("Calibration DONE ✅\r\n\r\n");
+}
+
+/* ================= READ SCALED DATA ================= */
+void MPU6050_Read(void)
+{
+  uint8_t raw[14];
+  int16_t axr, ayr, azr, gxr, gyr, gzr;
+  float ax, ay, az, gx, gy, gz;
+  char buf[200];
+
+  HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDR, ACCEL_XOUT_H, 1, raw, 14, HAL_MAX_DELAY);
+
+  axr = (raw[0] << 8) | raw[1];
+  ayr = (raw[2] << 8) | raw[3];
+  azr = (raw[4] << 8) | raw[5];
+  gxr = (raw[8] << 8) | raw[9];
+  gyr = (raw[10] << 8) | raw[11];
+  gzr = (raw[12] << 8) | raw[13];
+
+  ax = (axr - accel_offset_x) / 16384.0f;
+  ay = (ayr - accel_offset_y) / 16384.0f;
+  az = (azr - accel_offset_z) / 16384.0f;
+
+  gx = (gxr - gyro_offset_x) / 131.0f;
+  gy = (gyr - gyro_offset_y) / 131.0f;
+  gz = (gzr - gyro_offset_z) / 131.0f;
+
+  sprintf(buf,
+          "ACC[g] X:% .2f Y:% .2f Z:% .2f | "
+          "GYRO[dps] X:% .2f Y:% .2f Z:% .2f\r\n",
+          ax, ay, az, gx, gy, gz);
+
+  printu(buf);
+}
+
+/* ================= CLOCK ================= */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_Osc = {0};
+  RCC_ClkInitTypeDef RCC_Clk = {0};
+
+  RCC_Osc.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_Osc.HSEState = RCC_HSE_ON;
+  RCC_Osc.PLL.PLLState = RCC_PLL_ON;
+  RCC_Osc.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_Osc.PLL.PLLMUL = RCC_PLL_MUL9;
+  HAL_RCC_OscConfig(&RCC_Osc);
+
+  RCC_Clk.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
+                      RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  RCC_Clk.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_Clk.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_Clk.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_Clk.APB2CLKDivider = RCC_HCLK_DIV1;
+  HAL_RCC_ClockConfig(&RCC_Clk, FLASH_LATENCY_2);
+}
+
+/* ================= I2C ================= */
+static void MX_I2C1_Init(void)
+{
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  HAL_I2C_Init(&hi2c1);
+}
+
+/* ================= UART ================= */
+static void MX_USART1_UART_Init(void)
+{
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  HAL_UART_Init(&huart1);
+}
+
+/* ================= GPIO ================= */
+static void MX_GPIO_Init(void)
+{
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+}
+
+/* ================= ERROR ================= */
+void Error_Handler(void)
+{
+  __disable_irq();
+  while (1) {}
+}

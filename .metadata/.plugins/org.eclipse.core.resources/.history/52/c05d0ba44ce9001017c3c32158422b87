@@ -1,0 +1,207 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body (BMP180 test -> transmit one value)
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+/* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef huart1;
+I2C_HandleTypeDef hi2c1;
+
+/* USER CODE BEGIN PV */
+#define BMP180_ADDR     (0x77 << 1)   /* HAL expects 7-bit address shifted left */
+int16_t AC1,AC2,AC3,B1,B2,MB,MC,MD;
+uint16_t AC4,AC5,AC6;
+int32_t B5; /* intermediate for temp calculation */
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART1_UART_Init(void);
+static void MX_I2C1_Init(void);
+
+/* USER CODE BEGIN PFP */
+static HAL_StatusTypeDef bmp180_read_calibration(void);
+static HAL_StatusTypeDef bmp180_read_uncomp_temp(uint16_t *ut);
+static float bmp180_get_temperature_c(void);
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+
+/* USER CODE END 0 */
+
+int main(void)
+{
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+  HAL_Init();
+  SystemClock_Config();
+
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  MX_USART1_UART_Init();
+
+  /* Read calibration at startup */
+  if (bmp180_read_calibration() != HAL_OK) {
+    char err[] = "BMP180 calib read error\r\n";
+    HAL_UART_Transmit(&huart1, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
+    /* continue anyway - you can decide to halt here */
+  } else {
+    char ok[] = "BMP180 calibration OK\r\n";
+    HAL_UART_Transmit(&huart1, (uint8_t*)ok, strlen(ok), HAL_MAX_DELAY);
+  }
+
+  /* USER CODE BEGIN 2 */
+  /* Infinite loop: read ONE value (temperature) and transmit every 1s */
+  /* USER CODE END 2 */
+  while (1)
+  {
+    float temp_c = bmp180_get_temperature_c();
+
+    char out[64];
+    int len = snprintf(out, sizeof(out), "BMP180 Temp: %.1f C\r\n", temp_c);
+    if (len > 0) HAL_UART_Transmit(&huart1, (uint8_t*)out, (uint16_t)len, HAL_MAX_DELAY);
+
+    HAL_Delay(1000);
+  }
+}
+
+/* ---------- BMP180 helper implementations ---------- */
+
+static HAL_StatusTypeDef bmp180_read_calibration(void)
+{
+  uint8_t buf[22];
+  HAL_StatusTypeDef st = HAL_I2C_Mem_Read(&hi2c1, BMP180_ADDR, 0xAA, I2C_MEMADD_SIZE_8BIT, buf, 22, HAL_MAX_DELAY);
+  if (st != HAL_OK) return st;
+
+  AC1 = (int16_t)((buf[0] << 8) | buf[1]);
+  AC2 = (int16_t)((buf[2] << 8) | buf[3]);
+  AC3 = (int16_t)((buf[4] << 8) | buf[5]);
+  AC4 = (uint16_t)((buf[6] << 8) | buf[7]);
+  AC5 = (uint16_t)((buf[8] << 8) | buf[9]);
+  AC6 = (uint16_t)((buf[10] << 8) | buf[11]);
+  B1  = (int16_t)((buf[12] << 8) | buf[13]);
+  B2  = (int16_t)((buf[14] << 8) | buf[15]);
+  MB  = (int16_t)((buf[16] << 8) | buf[17]);
+  MC  = (int16_t)((buf[18] << 8) | buf[19]);
+  MD  = (int16_t)((buf[20] << 8) | buf[21]);
+
+  return HAL_OK;
+}
+
+static HAL_StatusTypeDef bmp180_read_uncomp_temp(uint16_t *ut)
+{
+  uint8_t cmd = 0x2E;
+  HAL_StatusTypeDef st;
+
+  st = HAL_I2C_Mem_Write(&hi2c1, BMP180_ADDR, 0xF4, I2C_MEMADD_SIZE_8BIT, &cmd, 1, HAL_MAX_DELAY);
+  if (st != HAL_OK) return st;
+
+  /* Wait 4.5ms per datasheet */
+  HAL_Delay(5);
+
+  uint8_t buf[2];
+  st = HAL_I2C_Mem_Read(&hi2c1, BMP180_ADDR, 0xF6, I2C_MEMADD_SIZE_8BIT, buf, 2, HAL_MAX_DELAY);
+  if (st != HAL_OK) return st;
+
+  *ut = (uint16_t)((buf[0] << 8) | buf[1]);
+  return HAL_OK;
+}
+
+static float bmp180_get_temperature_c(void)
+{
+  uint16_t ut;
+  if (bmp180_read_uncomp_temp(&ut) != HAL_OK) {
+    return -999.0f; /* error indicator */
+  }
+
+  /* Calculate true temperature per BMP180 datasheet */
+  int32_t X1 = ((int32_t)ut - (int32_t)AC6) * (int32_t)AC5 >> 15;
+  int32_t X2 = ((int32_t)MC << 11) / (X1 + (int32_t)MD);
+  B5 = X1 + X2;
+  int32_t T = (B5 + 8) >> 4; /* T in 0.1 deg C */
+
+  return ((float)T) / 10.0f;
+}
+
+/* ---------- Peripheral init functions (minimal) ---------- */
+
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) Error_Handler();
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK) Error_Handler();
+}
+
+static void MX_USART1_UART_Init(void)
+{
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK) Error_Handler();
+}
+
+/* Minimal I2C init - if you already have MX_I2C1_Init from CubeMX, keep that instead */
+static void MX_I2C1_Init(void)
+{
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x00303D5B; /* ~100kHz for many STM32 families; if CubeMX generated one, use that instead */
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK) Error_Handler();
+
+  /** Configure Analogue filter */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK) Error_Handler();
+}
+
+static void MX_GPIO_Init(void)
+{
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+}
+
+/* Error handler and assert as before */
+void Error_Handler(void)
+{
+  __disable_irq();
+  while (1) { }
+}
+
+#ifdef USE_FULL_ASSERT
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* optional */
+}
+#endif

@@ -1,0 +1,145 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : BMP180 Sensor Demo using STM32F103C8
+  ******************************************************************************
+  * @attention
+  *
+  * BMP180 I2C Pressure/Temperature/Altitude Example
+  * For STM32CubeIDE + STM32F103C8T6 (Blue Pill)
+  *
+  * Hardware Connections:
+  *   BMP180 VCC → 3.3V
+  *   BMP180 GND → GND
+  *   BMP180 SDA → PB7
+  *   BMP180 SCL → PB6
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+#include "bmp180.h"
+#include <stdio.h>
+
+/* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+UART_HandleTypeDef huart1;
+
+/* USER CODE BEGIN PV */
+
+/* USER CODE END PV */
+
+/* Function prototypes -------------------------------------------------------*/
+void SystemClock_Config(void);
+
+/* USER CODE BEGIN PFP */
+int _write(int file, char *ptr, int len);
+/* USER CODE END PFP */
+
+/* USER CODE BEGIN 0 */
+int _write(int file, char *ptr, int len)
+{
+  HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, HAL_MAX_DELAY);
+  return len;
+}
+/* USER CODE END 0 */
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+  /* MCU Configuration--------------------------------------------------------*/
+  HAL_Init();
+  SystemClock_Config();
+
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  MX_USART1_UART_Init();
+
+  /* USER CODE BEGIN 2 */
+  printf("\r\n=== BMP180 Sensor Demo ===\r\n");
+  printf("Initializing BMP180...\r\n");
+
+  BMP180_Init(&hi2c1);
+  HAL_Delay(100);
+
+  printf("BMP180 Initialized Successfully!\r\n");
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+      float temperature = BMP180_ReadTemperature(&hi2c1);
+      float pressure = BMP180_ReadPressure(&hi2c1, 3);      // oversampling 3 = ultra high resolution
+      float altitude = BMP180_ReadAltitude(&hi2c1, 1013.25f); // standard sea level pressure
+
+      printf("Temp: %.2f °C | Pressure: %.2f hPa | Altitude: %.2f m\r\n",
+              temperature, pressure, altitude);
+
+      HAL_Delay(1000);
+  }
+  /* USER CODE END WHILE */
+}
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Initializes the RCC Oscillators **/
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks **/
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+                              | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief  Error Handler
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  __disable_irq();
+  while (1)
+  {
+      HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+      HAL_Delay(250);
+  }
+}
+#ifdef  USE_FULL_ASSERT
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  printf("Wrong parameters value: file %s on line %lu\r\n", file, line);
+}
+#endif /* USE_FULL_ASSERT */

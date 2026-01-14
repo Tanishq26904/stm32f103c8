@@ -1,0 +1,23 @@
+21:17:42 **** Incremental Build of configuration Debug for project bmp180 ****
+make -j12 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m3 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F103xB -c -I../Core/Inc -I../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I../Drivers/STM32F1xx_HAL_Driver/Inc -I../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfloat-abi=soft -mthumb -o "Core/Src/main.o"
+arm-none-eabi-gcc -o "bmp180.elf" @"objects.list"   -mcpu=cortex-m3 -T"D:\projects\stm32_cube_ide\bmp180\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="bmp180.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: bmp180.elf
+ 
+arm-none-eabi-size  bmp180.elf 
+arm-none-eabi-objdump -h -S bmp180.elf  > "bmp180.list"
+   text	   data	    bss	    dec	    hex	filename
+  40252	    468	   2132	  42852	   a764	bmp180.elf
+arm-none-eabi-objcopy  -O ihex bmp180.elf  "bmp180.hex"
+Finished building: default.size.stdout
+arm-none-eabi-objcopy  -O binary bmp180.elf  "bmp180.bin"
+ 
+Finished building: bmp180.hex
+Finished building: bmp180.bin
+ 
+ 
+Finished building: bmp180.list
+ 
+
+21:17:43 Build Finished. 0 errors, 0 warnings. (took 808ms)
+
