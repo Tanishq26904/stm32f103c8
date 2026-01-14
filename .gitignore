@@ -1,0 +1,11 @@
+Objects/
+Listings/
+Debug/
+Release/
+*.axf
+*.hex
+*.bin
+*.map
+*.o
+*.bak
+*.uvgui.*
